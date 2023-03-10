@@ -41,6 +41,7 @@ class Callback(ttools.callbacks.ImageDisplayCallback):
         if is_val:
             return
 
+        # detach（）隔离对step_data数据梯度计算的影响
         gen = step_data["gen_image"][:16].detach()
         ref = step_data["gt_image"][:16].detach()
 
@@ -52,7 +53,7 @@ class Callback(ttools.callbacks.ImageDisplayCallback):
             vector = vector[:16].detach()
             vizdata = th.cat([vizdata, vector], 2)
 
-        vizdata = (vizdata + 1.0 ) * 0.5
+        vizdata = (vizdata + 1.0 ) * 0.5  # [-1,1]到[0，1]
         viz = th.clamp(vizdata, 0, 1)
         return viz
 

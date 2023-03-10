@@ -184,29 +184,29 @@ class SketchRNN(th.nn.Module):
             # Pen and displacement state for the next step
             next_state = th.zeros_like(current_input)
 
-            # Adjust temperature to control randomness
+            # Adjust temperature to control randomness：控制采样的随机度
             mixture_logits = mixture_logits*temperature
             pen_logits = pen_logits*temperature
 
-            # Select one of 3 pen states
+            # Select one of 3 pen states：用概率分布的形式
             pen_distrib = \
                 th.distributions.categorical.Categorical(logits=pen_logits)
-            # 按照传入的概率，在相应的位置处进行取样，取样返回的是该位置的整数索引
-            pen_state = pen_distrib.sample()   # logits 是事件的对数概率分布
+            # 按照传入的概率，在相应的位置处进行取样，取样返回的是该位置的整数索引。logits 是事件的对数概率分布。
+            pen_state = pen_distrib.sample()
 
             # One-hot encoding of the state
             next_state[:, :, 2:].scatter_(2, pen_state.unsqueeze(-1),
                                           th.ones_like(next_state[:, :, 2:]))
 
-            # Select one of the Gaussians from the mixture
+            # Select one of the M Gaussians from the mixture：从M个分布中通过概率随机选择一个，而不是加权平均
             mixture_distrib = \
                 th.distributions.categorical.Categorical(logits=mixture_logits)
-            mixture_idx = mixture_distrib.sample()
+            mixture_idx = mixture_distrib.sample()  # bs, 1
 
-            # select the Gaussian parameter
-            mixture_idx = mixture_idx.unsqueeze(-1).unsqueeze(-1)
-            mixture_idx = mixture_idx.repeat(1, 1, 1, 5)  # 以该概率对每个高斯参数进行最终采样，得到一组高斯参数
-            params = th.gather(gaussian_params, 2, mixture_idx).squeeze(2)
+            # select the Gaussian parameter：每个输出从M个分布中选择第mixture_idx个高斯分布
+            mixture_idx = mixture_idx.unsqueeze(-1).unsqueeze(-1)  # bs, 1, 1, 1
+            mixture_idx = mixture_idx.repeat(1, 1, 1, 5)  # bs, 1, 1, 5
+            params = th.gather(gaussian_params, 2, mixture_idx).squeeze(2)  # bs, 1, 5 ？
 
             # Sample a Gaussian from the corresponding Gaussian
             mu = params[..., :2]
@@ -220,7 +220,7 @@ class SketchRNN(th.nn.Module):
             # cov[..., 1, 1] = sigma_x.pow(2)*temperature  # 原代码仿佛这里有错，改为下面一行代码
             cov[..., 1, 1] = sigma_y.pow(2)*temperature
             cov[..., 1, 0] = sigma_x*sigma_y*rho_xy*temperature
-            # 创建由均值向量和协方差矩阵参数化的多元高斯分布
+            # 创建由均值向量和协方差矩阵参数化的多元（x，y）高斯分布
             point_distrib = \
                 th.distributions.multivariate_normal.MultivariateNormal(
                     mu, scale_tril=cov)  # scale_tril(Tensor) -协方差的下三角因子，positive-valued 对角线

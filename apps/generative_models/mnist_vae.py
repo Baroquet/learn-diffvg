@@ -22,19 +22,19 @@ import numpy as np
 import torch as th
 from torch.utils.data import DataLoader
 import torchvision.datasets as dset
-import torchvision.transforms as transforms
+import torchvision.transforms as transforms  # 数据增强类
 
 import ttools
-import ttools.interfaces
+import ttools.interfaces  # 推理封装类
 
-from modules import Flatten
+from modules import Flatten  # 批中每个数据展平成一维
 
 import pydiffvg
 
 LOG = ttools.get_logger(__name__)
 
 
-BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir)
+BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir)  # 获取当前位置的绝对路径
 VAE_OUTPUT = os.path.join(BASE_DIR, "results", "mnist_vae")
 AE_OUTPUT = os.path.join(BASE_DIR, "results", "mnist_ae")
 
@@ -66,14 +66,14 @@ class MNISTCallback(ttools.callbacks.ImageDisplayCallback):
 
     def visualized_image(self, batch, step_data, is_val=False):
         im = step_data["rendering"].detach().cpu()
-        im = 0.5 + 0.5*im
-        ref = batch[0].cpu()
+        im = 0.5 + 0.5*im  # 采样渲染输出
+        ref = batch[0].cpu()  # 真实数据集
 
         vizdata = [im, ref]
 
         # tensor to visualize, concatenate images
         viz = th.clamp(th.cat(vizdata, 2), 0, 1)
-        return viz
+        return viz  # bs, h, 2*w，并排显示两张图像
 
     def caption(self, batch, step_data, is_val=False):
         return "fake, real"
@@ -90,7 +90,7 @@ class VAEInterface(ttools.ModelInterface):
 
         self.w_kld = w_kld
 
-        self.variational = variational
+        self.variational = variational  # VAE或AE
 
         self.device = "cpu"
         if cuda:
@@ -99,7 +99,7 @@ class VAEInterface(ttools.ModelInterface):
         self.model.to(self.device)
 
         self.opt = th.optim.Adam(
-            self.model.parameters(), lr=lr, betas=(0.5, 0.5), eps=1e-12)
+            self.model.parameters(), lr=lr, betas=(0.5, 0.5), eps=1e-12)  # 默认betas=（0.9， 0.999），eps=1e-8
 
     def training_step(self, batch):
         im, label = batch[0], batch[1]
@@ -370,7 +370,7 @@ class VectorMNISTVAE(th.nn.Module):
 
         return output, aux
 
-
+# 加载mnist数据集，没有进行数据增强
 class Dataset(th.utils.data.Dataset):
     def __init__(self, data_dir, imsize):
         super(Dataset, self).__init__()
@@ -386,6 +386,7 @@ class Dataset(th.utils.data.Dataset):
         im, label = self.mnist[idx]
 
         # make sure data uses [0, 1] range
+        # 数据分布在 [-1, 1] 的范围
         im -= im.min()
         im /= im.max() + 1e-8
         im -= 0.5
@@ -411,7 +412,7 @@ def train(args):
                  "  zdim: %d\n"
                  "  conditional: %d\n"
                  "  fc: %d\n",
-                 args.samples, args.paths, args.segments,
+                 args.samples, args.paths, args.segments,  # 不灵活之处在于所有矢量参数必须是固定的
                  args.zdim, args.conditional, args.fc)
 
     model_params = dict(samples=args.samples, paths=args.paths,
@@ -467,10 +468,10 @@ def train(args):
         keys = ["data_loss", "loss"]
     port = 8080
     trainer.add_callback(ttools.callbacks.ProgressBarCallback(
-        keys=keys, val_keys=keys))
+        keys=keys, val_keys=keys))   # 控制台训练误差输出
     trainer.add_callback(ttools.callbacks.VisdomLoggingCallback(
-        keys=keys, val_keys=keys, env=name, port=port))
-    trainer.add_callback(MNISTCallback(
+        keys=keys, val_keys=keys, env=name, port=port))   # 训练过程可视化
+    trainer.add_callback(MNISTCallback(  # 添加自定义callback接口，显示fake和real图像
         env=name, win="samples", port=port, frequency=args.freq))
     trainer.add_callback(ttools.callbacks.CheckpointingCallback(
         checkpointer, max_files=2, interval=600, max_epochs=50))
@@ -671,7 +672,7 @@ if __name__ == "__main__":
                               help="number of samples in the MC rasterizer")
     parser_train.add_argument("--zdim", type=int, default=20,
                               help="dimension of the latent space")
-    parser_train.set_defaults(func=train)
+    parser_train.set_defaults(func=train)  # 为参数指定目标训练函数，被args.func()函数所激活，且参数列表与指定的train函数对应
 
     # -- Eval -----------------------------------------------------------------
     parser_sample = subs.add_parser("sample")
